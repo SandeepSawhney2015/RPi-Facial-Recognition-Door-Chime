@@ -9,14 +9,11 @@ from database import FaceDatabase
 model = YOLO("yolo11n.pt")
 identifier = FaceIdentifier()
 
-# Initialize SQLite database
+# Load known faces from SQLite
 db = FaceDatabase()
 known_faces = db.load_embeddings()
 
 THRESHOLD = 0.50
-
-# Name used when enrolling
-enrollment_name = None
 
 camera = cv2.VideoCapture(0)
 
@@ -37,7 +34,7 @@ try:
         results = model(frame, verbose=False)
         annotated_frame = results[0].plot()
 
-        # STEP 2: Detect faces and get their locations
+        # STEP 2: Detect faces and get locations
         faces = identifier.get_face_data(frame)
 
         # STEP 3: Identify each detected face
@@ -46,6 +43,7 @@ try:
             best_score = -1.0
             best_name = "UNKNOWN"
 
+            # Compare against stored face embeddings
             for name, stored_embedding in known_faces:
                 score = identifier.recognizer.match(
                     stored_embedding,
@@ -57,7 +55,7 @@ try:
                     best_score = score
                     best_name = name
 
-            # Determine identity
+            # STEP 4: Determine identity
             if best_score >= THRESHOLD:
                 label = f"{best_name} ({best_score:.3f})"
                 color = (0, 255, 0)
@@ -65,7 +63,7 @@ try:
                 label = "UNKNOWN"
                 color = (0, 0, 255)
 
-            # Draw face bounding box
+            # Draw bounding box around face
             cv2.rectangle(
                 annotated_frame,
                 (x, y),
@@ -74,7 +72,7 @@ try:
                 2
             )
 
-            # Position label beside the detected face
+            # Draw identity above or below face
             label_y = y - 10 if y >= 30 else y + h + 25
 
             cv2.putText(
@@ -87,73 +85,13 @@ try:
                 2
             )
 
-        # STEP 4: Display enrollment instructions
-        instructions = "N: Set Name | E: Enroll | Q: Quit"
-
-        cv2.putText(
-            annotated_frame,
-            instructions,
-            (20, annotated_frame.shape[0] - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2
+        # STEP 5: Display camera feed
+        cv2.imshow(
+            "Door Chime - AI Detection",
+            annotated_frame
         )
 
-        if enrollment_name:
-            cv2.putText(
-                annotated_frame,
-                f"Enrolling: {enrollment_name}",
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 255),
-                2
-            )
-
-        cv2.imshow("Door Chime - AI Detection", annotated_frame)
-
-        key = cv2.waitKey(1) & 0xFF
-
-        # STEP 5: Set enrollment name
-        if key == ord("n"):
-            name = input("Enter person's name: ").strip().lower()
-
-            if name:
-                enrollment_name = name
-                print(f"Enrollment name set to: {name}")
-            else:
-                print("Name cannot be empty!")
-
-        # STEP 6: Enroll a person
-        elif key == ord("e"):
-
-            if enrollment_name is None:
-                print("Press N to set a name first!")
-
-            elif len(faces) == 1:
-                embedding, _ = faces[0]
-
-                db.add_embedding(
-                    enrollment_name,
-                    embedding
-                )
-
-                # Update in-memory database
-                known_faces.append(
-                    (enrollment_name, embedding)
-                )
-
-                print(
-                    f"Embedding saved for {enrollment_name}!"
-                )
-
-            else:
-                print(
-                    "Enrollment requires exactly one face!"
-                )
-
-        elif key == ord("q"):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
 finally:

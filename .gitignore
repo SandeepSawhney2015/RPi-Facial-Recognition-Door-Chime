@@ -1,2 +1,8 @@
 .venv
-yolo11n.pt
+*.pt
+faces.db
+*.db-journal
+*.db-wal
+*.db-shm
+models
+__pycache__

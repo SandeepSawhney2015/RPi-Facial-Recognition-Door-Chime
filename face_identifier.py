@@ -1,6 +1,6 @@
 import cv2
 
-class FaceIdenifier:
+class FaceIdentifier:
     def __init__(self):
         self.detector = cv2.FaceDetectorYN.create("models/yunet.onnx", "", (320, 320))
         self.recognizer = cv2.FaceRecognizerSF.create("models/sface.onnx", "")

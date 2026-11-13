@@ -1,113 +1,101 @@
 
 import cv2
+import sys
+from ultralytics import YOLO
 from face_identifier import FaceIdentifier
 from database import FaceDatabase
 
-identifier = FaceIdentifier()
-db = FaceDatabase()
+# Initialize YOLO object detection
+model = YOLO("yolo11n.pt")
 
-# Load existing embeddings from SQLite
+# Initialize face detection and recognition
+identifier = FaceIdentifier()
+
+# Open SQLite database and load known embeddings
+db = FaceDatabase()
 known_faces = db.load_embeddings()
 
-# Initial threshold (adjust after testing)
+# Minimum cosine similarity required for recognition
 THRESHOLD = 0.50
 
-# Name currently being enrolled
-enrollment_name = None
-
+# Open MacBook webcam
 camera = cv2.VideoCapture(0)
 
 if not camera.isOpened():
-    raise RuntimeError("Camera not available")
+    print("Could not open camera!", file=sys.stderr)
+    db.close()
+    sys.exit(1)
 
 try:
     while True:
         success, frame = camera.read()
 
         if not success:
+            print("Failed to read frame!", file=sys.stderr)
             break
 
+        # STEP 1: YOLO object detection
+        results = model(frame, verbose=False)
+
+        # Draw YOLO bounding boxes
+        annotated_frame = results[0].plot()
+
+        # STEP 2: Detect faces and generate embeddings
         embeddings = identifier.get_embeddings(frame)
 
-        # Compare every detected face against our database
+        # STEP 3: Identify detected faces
+        if not embeddings:
+            cv2.putText(
+                annotated_frame,
+                "No face detected",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 255),
+                2
+            )
+
         for i, embedding in enumerate(embeddings):
 
             best_score = -1.0
             best_name = "UNKNOWN"
 
-            # Compare against every saved embedding
-            for name, stored in known_faces:
+            # Compare current face against stored faces
+            for name, stored_embedding in known_faces:
                 score = identifier.recognizer.match(
-                    stored,
+                    stored_embedding,
                     embedding,
                     cv2.FaceRecognizerSF_FR_COSINE
                 )
 
-                # Update the best matching identity
                 if score > best_score:
                     best_score = score
                     best_name = name
 
-            # Determine whether the match is sufficient
+            # STEP 4: Determine identity
             if best_score >= THRESHOLD:
                 label = f"{best_name} ({best_score:.3f})"
-                color = (0, 255, 0)
+                color = (0, 255, 0)  # Green
             else:
                 label = "UNKNOWN"
-                color = (0, 0, 255)
+                color = (0, 0, 255)  # Red
 
+            # Display recognized name on screen
             cv2.putText(
-                frame,
+                annotated_frame,
                 label,
-                (20, 50 + i * 35),
+                (20, 40 + i * 35),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
                 color,
                 2
             )
 
-        # Display enrollment instructions
-        cv2.putText(
-            frame,
-            "N: Set Name | E: Enroll | Q: Quit",
-            (20, frame.shape[0] - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2
-        )
+        # STEP 5: Display video
+        cv2.imshow("Door Chime - AI Detection", annotated_frame)
 
-        cv2.imshow("Face Recognition", frame)
-
-        key = cv2.waitKey(1) & 0xFF
-
-        # Set the current enrollment name
-        if key == ord("n"):
-            name = input("Enter person's name: ").strip().lower()
-
-            if name:
-                enrollment_name = name
-                print(f"Enrollment name set to: {enrollment_name}")
-            else:
-                print("Name cannot be empty!")
-
-        # Save an embedding for the selected person
-        elif key == ord("e"):
-            if enrollment_name is None:
-                print("Press N to enter a name first!")
-
-            elif len(embeddings) == 1:
-                db.add_embedding(enrollment_name, embeddings[0])
-                known_faces.append(
-                    (enrollment_name, embeddings[0])
-                )
-
-                print(f"Embedding saved for {enrollment_name}!")
-
-            else:
-                print("Enrollment requires exactly one face!")
-
-        elif key == ord("q"):
+        # Press Q to exit
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
 finally:

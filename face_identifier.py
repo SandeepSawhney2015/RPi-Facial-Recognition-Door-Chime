@@ -3,13 +3,8 @@ import cv2
 
 class FaceIdentifier:
     def __init__(self):
-        self.detector = cv2.FaceDetectorYN.create(
-            "models/yunet.onnx", "", (320, 320)
-        )
-
-        self.recognizer = cv2.FaceRecognizerSF.create(
-            "models/sface.onnx", ""
-        )
+        self.detector = cv2.FaceDetectorYN.create("models/yunet.onnx", "", (320, 320))
+        self.recognizer = cv2.FaceRecognizerSF.create("models/sface.onnx", "")
 
     def get_face_data(self, frame):
         height, width = frame.shape[:2]

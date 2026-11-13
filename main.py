@@ -6,7 +6,7 @@ from face_identifier import FaceIdentifier
 from database import FaceDatabase
 
 # Initialize models
-model = YOLO("yolo11n.pt")
+model = YOLO("yolo11s.pt")
 identifier = FaceIdentifier()
 
 # Load known faces from SQLite
@@ -39,17 +39,14 @@ try:
 
         # STEP 3: Identify each detected face
         for embedding, (x, y, w, h) in faces:
-
             best_score = -1.0
             best_name = "UNKNOWN"
-
             # Compare against stored face embeddings
             for name, stored_embedding in known_faces:
                 score = identifier.recognizer.match(
                     stored_embedding,
                     embedding,
-                    cv2.FaceRecognizerSF_FR_COSINE
-                )
+                    cv2.FaceRecognizerSF_FR_COSINE)
 
                 if score > best_score:
                     best_score = score

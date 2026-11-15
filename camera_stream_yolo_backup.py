@@ -1,0 +1,89 @@
+
+from picamera2 import Picamera2
+from ultralytics import YOLO
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import cv2
+
+# Load YOLO11 on the Raspberry Pi CPU
+model = YOLO("yolo11n.pt")
+
+# Initialize Raspberry Pi Camera Module 3
+camera = Picamera2()
+
+camera.configure(
+    camera.create_video_configuration(
+        main={"size": (640, 480), "format": "RGB888"}
+    )
+)
+
+camera.start()
+
+
+class CameraHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/":
+            self.send_error(404)
+            return
+
+        self.send_response(200)
+        self.send_header(
+            "Content-Type",
+            "multipart/x-mixed-replace; boundary=frame"
+        )
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        print("Browser connected")
+
+        try:
+            while True:
+                # 1. Capture frame from Pi camera
+                frame = camera.capture_array()
+
+                # 2. Run YOLO11 object detection
+                results = model.predict(
+                    source=frame,
+                    imgsz=320,
+                    device="cpu",
+                    verbose=False
+                )
+
+                # 3. Draw bounding boxes and labels
+                annotated_frame = results[0].plot()
+
+                # 4. Encode annotated frame as JPEG
+                success, jpeg = cv2.imencode(
+                    ".jpg",
+                    annotated_frame,
+                    [cv2.IMWRITE_JPEG_QUALITY, 75]
+                )
+
+                if not success:
+                    continue
+
+                # 5. Send annotated frame to browser
+                self.wfile.write(b"--frame\r\n")
+                self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                self.wfile.write(
+                    f"Content-Length: {len(jpeg)}\r\n\r\n".encode()
+                )
+                self.wfile.write(jpeg.tobytes())
+                self.wfile.write(b"\r\n")
+
+        except (BrokenPipeError, ConnectionResetError):
+            print("Browser disconnected")
+
+
+# VS Code forwards port 8000 to the MacBook
+server = HTTPServer(("127.0.0.1", 8000), CameraHandler)
+
+print("YOLO11 camera stream running on port 8000")
+
+try:
+    server.serve_forever()
+except KeyboardInterrupt:
+    print("Stopping YOLO11 camera stream...")
+finally:
+    server.server_close()
+    camera.stop()
+    camera.close()

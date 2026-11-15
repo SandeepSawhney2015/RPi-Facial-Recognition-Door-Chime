@@ -3,3 +3,9 @@
 opencv-python==5.0.0.93
 numpy==2.5.4
 ultralytics==8.4.211
+
+# Raspberry Pi only. picamera2 ships with Raspberry Pi OS as an apt package
+# (python3-picamera2) and is not reliably installable from PyPI, so it is
+# not pinned here. On the Pi, create the venv with --system-site-packages
+# so it can see the apt-installed picamera2 and libcamera bindings.
+# picamera2

@@ -85,6 +85,19 @@ The stream server binds to `127.0.0.1:8000` on the Pi, so it is never exposed to
 
 ## Setup
 
+### A note on CUDA (read this first)
+
+Everything in this project runs on the CPU. The one dependency to be careful with is `ultralytics`, which depends on `torch`. On Linux, the default PyPI build of `torch` pulls in several gigabytes of NVIDIA CUDA libraries (cuDNN, NCCL and friends) that are useless on a Raspberry Pi and will fill the SD card.
+
+`requirements.txt` avoids this by pinning `torch` and `torchvision` to PyTorch's CPU-only wheel index. Always install with `pip install -r requirements.txt`. Do **not** run a bare `pip install ultralytics` on Linux, or you will get the CUDA build.
+
+If you have already installed the CUDA build by accident, remove it and reinstall from the requirements file:
+
+```bash
+pip uninstall -y torch torchvision $(pip list 2>/dev/null | awk '/^nvidia-/ {print $1}')
+pip install -r requirements.txt
+```
+
 ### Mac (development)
 
 Create a virtual environment and install dependencies:
@@ -105,6 +118,8 @@ python3 -m venv --system-site-packages .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+The requirements file installs the CPU-only `torch` wheel on Linux, so this should stay well under a gigabyte. If you see `nvidia-cudnn` or similar scrolling past, stop and check the note on CUDA above.
 
 Install Tailscale on the Pi and the Mac, sign both into the same tailnet, then SSH to the Pi using its Tailscale hostname.
 

@@ -1,5 +1,27 @@
-# Direct dependencies only. Transitive packages (torch, matplotlib, etc.)
-# are pulled in by ultralytics and resolved by pip.
+# CPU-only install. Everything in this project runs on the CPU (MacBook or
+# Raspberry Pi 5), so there is no reason to download CUDA.
+#
+# IMPORTANT: ultralytics depends on torch, and the default PyPI build of
+# torch on Linux pulls in several gigabytes of nvidia-* CUDA packages
+# (cuDNN, NCCL, cuSPARSELt, ...). To avoid that, torch and torchvision are
+# pinned to PyTorch's CPU-only wheel index below. Keep these lines ABOVE
+# ultralytics so pip resolves torch from the CPU index first.
+#
+# Install with:   pip install -r requirements.txt
+# Do NOT install ultralytics on its own with a bare `pip install ultralytics`
+# on Linux, or you will get the CUDA build of torch.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Linux (Raspberry Pi): explicit +cpu wheels, no nvidia-* dependencies.
+torch==2.15.0+cpu; sys_platform == "linux"
+torchvision==0.29.2+cpu; sys_platform == "linux"
+
+# macOS: PyPI wheels are already CPU/MPS-only, no CUDA involved.
+torch==2.15.0; sys_platform == "darwin"
+torchvision==0.29.2; sys_platform == "darwin"
+
+# Direct dependencies.
 opencv-python==5.0.0.93
 numpy==2.5.4
 ultralytics==8.4.211
